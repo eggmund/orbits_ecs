@@ -16,6 +16,8 @@ use amethyst::{
     },
 };
 
+pub const G: f32 = 0.001;    // Strength of gravity
+
 pub mod components {
     use amethyst::{
         ecs::{Component, DenseVecStorage},
@@ -45,7 +47,7 @@ impl<'a> System<'a> for VelocitySystem {
     );
 
     fn run(&mut self, (time, mut transforms, velocities): Self::SystemData) {
-        let dt= time.delta_seconds();
+        let dt= time.fixed_seconds();
 
         for (transform, velocity) in (&mut transforms, &velocities).join() {
             transform.prepend_translation_x(velocity.x * dt);
@@ -65,8 +67,6 @@ impl<'a> System<'a> for GravitySystem {
     );
 
     fn run(&mut self, (entities, transforms, masses, mut forces): Self::SystemData) {
-        const G: f32 = 0.01;    // Strength of gravity
-
         for (entity, force, mass, transform) in (&entities, &mut forces, &masses, &transforms).join() {
             for (other_entity, other_mass, other_transform) in (&entities, &masses, &transforms).join() {
                 if entity.id() != other_entity.id() { // If not the same planet
@@ -98,7 +98,7 @@ impl<'a> System<'a> for ForceSystem {
     );
 
     fn run(&mut self, (time, masses, mut velocities, mut forces): Self::SystemData) {
-        let dt = time.delta_seconds();
+        let dt = time.fixed_seconds();
         // Update velocities with a force
         // F = ma, a = F/m, a = dv/dt, dv = a dt
         for (velocity, force, mass) in (&mut velocities, &forces, &masses).join() {

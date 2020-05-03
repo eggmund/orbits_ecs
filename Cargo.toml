@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 amethyst = "0.15.0"
 shrinkwraprs = "0.3"
+rand = "0.7"
 
 [features]
 default = ["vulkan"]

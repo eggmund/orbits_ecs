@@ -1,10 +1,11 @@
 #[macro_use] extern crate shrinkwraprs;
 
 mod physics;
+mod entities;
 
 use amethyst::{
     core::{
-        math::{Vector2, Vector3, Point2},
+        math::{Vector2, Point2},
         transform::{TransformBundle, Transform}
     },
     prelude::*,
@@ -13,13 +14,12 @@ use amethyst::{
         plugins::{RenderFlat2D, RenderToWindow},
         types::DefaultBackend,
         RenderingBundle,
-        SpriteRender, SpriteSheet, SpriteSheetFormat, Texture,
+        SpriteSheet, SpriteSheetFormat, Texture,
         ImageFormat,
     },
     assets::{AssetStorage, Loader, Handle},
     utils::application_root_dir,
 };
-use std::f32::consts::PI;
 
 const CAMERA_DIMS: (f32, f32) = (800.0, 600.0);
 
@@ -30,21 +30,19 @@ impl SimpleState for MainState {
         let world = data.world;
 
         let spritesheet = Self::load_spritesheet(world);
+        let mut rand_thread = rand::thread_rng();
 
-        Self::add_planet(
+        entities::planet::add_planet_with_rings(
             world,
             spritesheet.clone(),
+            &mut rand_thread,
             Point2::new(CAMERA_DIMS.0/2.0, CAMERA_DIMS.1/2.0),
             Vector2::new(0.0, 0.0),
-            10.0,
-        );
-
-        Self::add_planet(
-            world,
-            spritesheet,
-            Point2::new(CAMERA_DIMS.0/2.0, CAMERA_DIMS.1/3.0),
-            Vector2::new(0.0, 0.0),
-            10.0,
+            50.0,
+            1000,
+            (20.0, 200.0),
+            (0.5, 1.5),
+            true,
         );
 
 
@@ -83,39 +81,6 @@ impl MainState {
             (),
             &sprite_sheet_store,
         )
-    }
-
-    fn add_planet(
-        world: &mut World,
-        sprite_sheet_handle: Handle<SpriteSheet>,
-        pos: Point2<f32>,
-        vel: Vector2<f32>,
-        radius: f32
-    ) {
-        const SPRITE_RADIUS: f32 = 32.0/2.0;    // Radius of default sprite = width/2.0
-        const SPRITE_RATIO: f32 = 1.0/SPRITE_RADIUS;
-        const PLANET_DENSITY: f32 = 5000.0;
-
-        // Get the planet sprite from the spritesheet
-        let sprite_render = SpriteRender {
-            sprite_sheet: sprite_sheet_handle,
-            sprite_number: 0,
-        };
-
-        let mut transform = Transform::default();
-        transform.set_scale(Vector3::new(SPRITE_RATIO * radius, SPRITE_RATIO * radius, 0.0));
-        transform.set_translation_xyz(pos.x, pos.y, 0.0);
-
-        // m = v * density
-        let mass = 4.0/3.0 * PI * radius.powi(3) * PLANET_DENSITY;
-
-        world.create_entity()
-            .with(sprite_render)
-            .with(transform)
-            .with(physics::Velocity(vel))
-            .with(physics::Mass(mass))
-            .with(physics::Force(Vector2::zeros()))
-            .build();
     }
 }
 
