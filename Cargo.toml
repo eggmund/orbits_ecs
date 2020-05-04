@@ -8,6 +8,7 @@ edition = "2018"
 amethyst = "0.15.0"
 shrinkwraprs = "0.3"
 rand = "0.7"
+log = "0.4"
 
 [features]
 default = ["vulkan"]

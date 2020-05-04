@@ -64,7 +64,7 @@ pub mod planet {
             .with(crate::physics::Force(Vector2::zeros()))
             .build();
     }
-    
+
     pub fn add_planet_with_rings(
         world: &mut World,
         spritesheet_handle: Handle<SpriteSheet>,

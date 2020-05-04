@@ -82,8 +82,6 @@ impl<'a> System<'a> for GravitySystem {
                 }
             }
         }
-
-        // Reset all forces to 0
     }
 }
 
@@ -116,3 +114,7 @@ impl<'a> System<'a> for ForceSystem {
         }
     }
 }
+
+pub struct CollisionSystem;
+
+
