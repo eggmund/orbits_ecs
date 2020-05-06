@@ -10,6 +10,7 @@ shrinkwraprs = "0.3"
 rand = "0.7"
 log = "0.4"
 ncollide2d = "0.21"
+shred-derive = "0.6.2"
 
 [features]
 default = ["vulkan"]

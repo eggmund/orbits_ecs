@@ -1,6 +1,127 @@
 use amethyst::{
-    ecs::{System, Write}
+    ecs::{System, SystemData, Write, WriteStorage, ReaderId, Read, Entities, World},
+    core::{
+        transform::Transform, 
+        SystemDesc,
+        math::{Vector2},
+    },
+    renderer::SpriteRender,
+    shrev::EventChannel,
+    shred::ResourceId,
+    input::{InputHandler, StringBindings},
 };
+use crate::components::*;
+use crate::resources::{SpriteRenders, MouseInfo};
+use crate::events::BodyCreationEvent;
+
+
+// System for creating bodies from an events channel.
+pub struct BodyCreationSystem {
+    reader_id: ReaderId<BodyCreationEvent>,
+}
+
+impl<'a> System<'a> for BodyCreationSystem {
+    type SystemData = (
+        Entities<'a>,
+        Read<'a, EventChannel<BodyCreationEvent>>,
+        BodyCreationData<'a>,
+    );
+
+    fn run(
+        &mut self,
+        (
+            mut entities,
+            events,
+            mut body_creation_sys_data,
+        ): Self::SystemData
+    ) {
+        for creation_event in events.read(&mut self.reader_id) {
+            info!("Creating body: {:?}", creation_event);
+            creation_event.build_entity(
+                &mut entities,
+                &mut body_creation_sys_data,
+            );
+        }
+    }
+}
+
+impl BodyCreationSystem {
+    pub fn new(reader_id: ReaderId<BodyCreationEvent>) -> Self {
+        Self { reader_id }
+    }
+}
+
+pub struct BodyCreationSystemDesc;
+
+impl<'a, 'b> SystemDesc<'a, 'b, BodyCreationSystem> for BodyCreationSystemDesc {
+    fn build(self, world: &mut World) -> BodyCreationSystem {
+        <BodyCreationSystem as System<'_>>::SystemData::setup(world);
+    
+        let reader_id = world.fetch_mut::<EventChannel<BodyCreationEvent>>().register_reader();
+        BodyCreationSystem::new(reader_id)
+    }
+}
+
+#[derive(SystemData)]
+pub struct BodyCreationData<'a> { // Data needed to create new body
+    pub body_type: WriteStorage<'a, BodyType>,
+    pub transforms: WriteStorage<'a, Transform>,
+    pub velocities: WriteStorage<'a, Velocity>,
+    pub colliders: WriteStorage<'a, Collider>,
+    pub forces: WriteStorage<'a, Force>,
+    pub masses: WriteStorage<'a, Mass>,
+    pub renders_resource: Read<'a, SpriteRenders>,
+    pub render_storage: WriteStorage<'a, SpriteRender>,
+}
+
+
+pub struct InputParsingSystem;
+
+impl<'a> System<'a> for InputParsingSystem {
+    type SystemData = (
+        Read<'a, InputHandler<StringBindings>>,
+        Write<'a, MouseInfo>,
+        Write<'a, EventChannel<BodyCreationEvent>>,
+    );
+
+    fn run(&mut self, (input, mut mouse_info, mut body_creation_channel): Self::SystemData) {
+        use crate::CAMERA_DIMS;
+
+        if input.action_is_down("add_planet").unwrap_or(false) && !mouse_info.is_down {
+            info!("Mouse down start.");
+            mouse_info.is_down = true;
+            let pos = input.mouse_position().unwrap();
+            mouse_info.click_pos = Some(Vector2::new(pos.0, CAMERA_DIMS.1 - pos.1));
+        }
+
+        // if no longer down
+        if !input.action_is_down("add_planet").unwrap_or(false) && mouse_info.is_down && mouse_info.click_pos.is_some() {
+            const RAD: f32 = 10.0;
+
+            let original_click_pos = mouse_info.click_pos.unwrap();
+
+            info!("Mouse down end.");
+            mouse_info.is_down = false;
+            let curr_pos = {
+                let pos = input.mouse_position().unwrap();
+                Vector2::new(pos.0, CAMERA_DIMS.1 - pos.1)
+            };
+
+            let d_pos = original_click_pos - curr_pos;
+            let mass = crate::tools::volume_of_sphere(RAD) * crate::entities::body::PLANET_DENSITY;
+
+            body_creation_channel.single_write(BodyCreationEvent {
+                body_type: BodyType::from_mass(mass),
+                position: original_click_pos.into(),
+                velocity: d_pos,
+                mass,
+                radius: RAD,
+            });
+        }
+    }
+}
+
+
 
 pub mod physics {
     use amethyst::{
@@ -10,27 +131,19 @@ pub mod physics {
             Join,
             Entities, Entity,
             World,
-            world::Builder,
         },
         core::{
             SystemDesc,
-            math::{Vector2, Vector3},
+            math::{Vector2, Point2},
             Time,
             Transform,
-            EventReader,
-            RunNowDesc,
         },
-        DataInit,
-        derive::SystemDesc,
         shrev::EventChannel,
-        renderer::{SpriteRender, SpriteSheet},
-        assets::{AssetStorage, Handle},
     };
     use std::collections::HashSet;
     
-    use crate::components::{*, physics::*};
-    use crate::resources;
-    use crate::events::{CollisionEvent};
+    use crate::components::*;
+    use crate::events::*;
     
     pub const G: f32 = 0.0001;    // Strength of gravity
     
@@ -44,7 +157,7 @@ pub mod physics {
         );
     
         fn run(&mut self, (time, mut transforms, velocities): Self::SystemData) {
-            let dt= time.fixed_seconds();
+            let dt= time.delta_seconds();
     
             for (transform, velocity) in (&mut transforms, &velocities).join() {
                 transform.prepend_translation_x(velocity.x * dt);
@@ -94,7 +207,7 @@ pub mod physics {
         );
     
         fn run(&mut self, (time, masses, mut velocities, mut forces): Self::SystemData) {
-            let dt = time.fixed_seconds();
+            let dt = time.delta_seconds();
             // Update velocities with a force
             // F = ma, a = F/m, a = dv/dt, dv = a dt
             for (velocity, force, mass) in (&mut velocities, &forces, &masses).join() {
@@ -170,6 +283,7 @@ pub mod physics {
                 let (contains1, contains2) = (group.contains(&e1), group.contains(&e2));
                 if contains1 || contains2 {  // If it contains either one, but not both
                     if contains1 && contains2 { // Already BOTH in group, so ignore
+                        info!("{:?} and {:?} already paired.", e1, e2);
                         already_paired = true;
                     } else {
                         if contains1 {
@@ -203,40 +317,27 @@ pub mod physics {
         type SystemData = (
             Entities<'a>,
             Read<'a, EventChannel<CollisionEvent>>,
-            Read<'a, resources::SpriteRenders>,
-            WriteStorage<'a, SpriteRender>,
-            // Need to add planet so needs write access to all these
-            WriteStorage<'a, Transform>,
-            // WriteStorage<'a, SpriteRender>,
-            WriteStorage<'a, Velocity>,
-            WriteStorage<'a, Collider>,
-            WriteStorage<'a, Force>,
-            WriteStorage<'a, Mass>,
+            Write<'a, EventChannel<BodyCreationEvent>>,
+            ReadStorage<'a, Transform>,
+            ReadStorage<'a, Velocity>,
+            ReadStorage<'a, Mass>,
         );
 
         fn run(
             &mut self,
             (
                 entities,
-                event_channel,
-                sprite_renders,
-                mut sprite_renders_storage,
-                mut transforms,
-                // mut sprite_render_storage,
-                mut velocities,
-                mut colliders,
-                mut forces,
-                mut masses,
+                collision_event_channel,
+                mut body_creation_event_channel,
+                transforms,
+                velocities,
+                masses,
             ): Self::SystemData
         ) {
-            use ncollide2d::shape::Ball;
-
-            let render = sprite_renders.planet.as_ref().unwrap().clone();
-
-            for event in event_channel.read(&mut self.reader_id) {
+            for event in collision_event_channel.read(&mut self.reader_id) {
                 let group: &HashSet<Entity> = &event.group;
 
-                info!("Event: {:?}", event);
+                info!("CollisionEvent: {:?}", event);
         
                 // Find centre of mass = new position
                 // r_com = SUM( m * r ) where r is position vector
@@ -264,27 +365,16 @@ pub mod physics {
                 }
     
                 // p = mv, v = p/m
-                let vel = Velocity(momentum_sum/mass_sum);
-                let volume = mass_sum/crate::entities::body::PLANET_DENSITY;
-                let radius = crate::tools::inverse_volume_of_sphere(volume);
-                let collider = Collider(Box::new(Ball::new(radius)));
+                let r_com: Point2<f32> = Point2::from(r_m_sum/mass_sum as f32);
+                let vel = momentum_sum/mass_sum;
 
-                let r_com: Vector2<f32> = r_m_sum/mass_sum as f32;
-                let mut transform = Transform::default();
-                transform.set_translation_xyz(r_com.x, r_com.y, 0.0);
-                transform.set_scale(Vector3::new(radius * crate::entities::body::PLANET_SPRITE_RATIO, radius * crate::entities::body::PLANET_SPRITE_RATIO, 1.0));
-
-
-                info!("Building entity");
-                // Make new entity with position of centre of mass.
-                entities.build_entity()
-                    .with(transform, &mut transforms)
-                    .with(render.clone(), &mut sprite_renders_storage)
-                    .with(vel, &mut velocities)
-                    .with(collider, &mut colliders)
-                    .with(Force::default(), &mut forces)
-                    .with(Mass(mass_sum), &mut masses)
-                    .build();
+                body_creation_event_channel.single_write(BodyCreationEvent {
+                    body_type: BodyType::from_mass(mass_sum),
+                    position: r_com,
+                    velocity: vel,
+                    mass: mass_sum,
+                    radius: crate::tools::inverse_volume_of_sphere(mass_sum/crate::entities::body::PLANET_DENSITY),
+                });
             }
         }
     }

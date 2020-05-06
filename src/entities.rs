@@ -6,7 +6,7 @@ pub mod body {
 
     const STAR_MIN_RADIUS: f32 = 50.0;
     // Point at which planet becomes a star.
-    const PLANET_STAR_MASS_BOUNDARY: f32 = 4.0/3.0 * PI * STAR_MIN_RADIUS * STAR_MIN_RADIUS * STAR_MIN_RADIUS * PLANET_DENSITY;
+    pub const PLANET_STAR_MASS_BOUNDARY: f32 = 4.0/3.0 * PI * STAR_MIN_RADIUS * STAR_MIN_RADIUS * STAR_MIN_RADIUS * PLANET_DENSITY;
     pub const PLANET_DENSITY: f32 = 5000.0;
 
     // Returns the magnitude of the velocity (speed) needed for a circular orbit around another planet

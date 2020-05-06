@@ -1,0 +1,6 @@
+(
+    axes: {},
+    actions: {
+        "add_planet": [[Mouse(Left)]],
+    },
+)

@@ -1,12 +1,33 @@
+pub use physics::*;
+
 use amethyst::{
     ecs::{Component, DenseVecStorage},
+    renderer::SpriteRender,
 };
+use crate::resources::SpriteRenders;
 
-#[derive(Component)]
+#[derive(Component, Debug, Copy, Clone)]
 pub enum BodyType {
     Planet,
     Star,
 }
+
+impl BodyType {
+    pub fn from_mass(m: f32) -> Self {
+        if m > crate::entities::body::PLANET_STAR_MASS_BOUNDARY {
+            BodyType::Star
+        } else {
+            BodyType::Planet
+        }
+    }
+
+    pub fn get_render(&self, renders: &SpriteRenders) -> SpriteRender {
+        match *self {
+            Self::Planet | Self::Star => renders.planet.as_ref().unwrap().clone(),
+        }
+    }
+}
+
 
 pub mod physics {
     use amethyst::{

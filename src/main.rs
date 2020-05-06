@@ -1,5 +1,6 @@
 #[macro_use] extern crate shrinkwraprs;
 #[macro_use] extern crate log;
+#[macro_use] extern crate shred_derive;
 
 mod components;
 mod systems;
@@ -12,11 +13,11 @@ use amethyst::{
     core::{
         math::{Vector2, Point2, Vector3},
         transform::{TransformBundle, Transform},
-        Time, SystemDesc, RunNowDesc,
+        Time,
     },
     prelude::*,
     renderer::{
-        light::Light,
+        // light::Light,
         Camera,
         plugins::{RenderFlat2D, RenderToWindow},
         types::DefaultBackend,
@@ -26,8 +27,8 @@ use amethyst::{
     },
     ui::{UiFinder, UiText, UiBundle, UiCreator, RenderUi},
     input::{StringBindings, InputBundle},
-    ecs::{Entity, Read, LazyUpdate, Entities, ReadStorage, Join, WriteStorage},
-    assets::{AssetStorage, Loader, Handle, ProgressCounter, Processor},
+    ecs::{Entity},
+    assets::{AssetStorage, Loader, Handle, ProgressCounter},
     utils::{application_root_dir, fps_counter},
 };
 use rand::rngs::ThreadRng;
@@ -44,7 +45,7 @@ struct MainState {
 impl SimpleState for MainState {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let world = data.world;
-        let mut rand_thread = rand::thread_rng();
+        // let mut rand_thread = rand::thread_rng();
 
         Self::init_camera(world);
         self.sprite_sheet = Some(self.load_spritesheet(world));
@@ -55,6 +56,7 @@ impl SimpleState for MainState {
                 sprite_number: 0,
             }),
         });
+        world.insert(resources::MouseInfo::default());
 
         world.exec(|mut creator: UiCreator<'_>| {
             creator.create("ui/fps.ron", &mut self.progress_counter);
@@ -62,37 +64,36 @@ impl SimpleState for MainState {
 
 
         let dist = 300.0;
-        // self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 + 100.0), Vector2::zeros(), 30.0);
-        // self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 - 100.0), Vector2::zeros(), 30.0);
+        self.add_body(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 + 100.0), Vector2::zeros(), 30.0);
+        self.add_body(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 - 100.0), Vector2::zeros(), 30.0);
 
-        // self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 + dist/2.0, CAMERA_DIMS.1/2.0 + 100.0), Vector2::zeros(), 30.0);
-        // self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 + dist/2.0, CAMERA_DIMS.1/2.0 - 100.0), Vector2::zeros(), 30.0);
+        // self.add_body(world, Point2::new(CAMERA_DIMS.0/2.0 + dist/2.0, CAMERA_DIMS.1/2.0 + 100.0), Vector2::zeros(), 30.0);
+        // self.add_body(world, Point2::new(CAMERA_DIMS.0/2.0 + dist/2.0, CAMERA_DIMS.1/2.0 - 100.0), Vector2::zeros(), 30.0);
 
 
-        // self.add_planet(
+        // self.add_body(
         //     world,
         //     Point2::new(CAMERA_DIMS.0/2.0, CAMERA_DIMS.1/2.0 + (dist.powi(2) - (dist/2.0).powi(2)).sqrt()), // Using pythag
         //     Vector2::zeros(),
         //     30.0
         // );
-        self.add_planet_with_rings(
-            world,
-            &mut rand_thread,
-            Point2::new(CAMERA_DIMS.0/2.0, CAMERA_DIMS.1/2.0),
-            Vector2::zeros(),
-            50.0,
-            400,
-            (20.0, 200.0),
-            (0.7, 1.8),
-            true,
-        );
+        // self.add_body_with_rings(
+        //     world,
+        //     &mut rand_thread,
+        //     Point2::new(CAMERA_DIMS.0/2.0, CAMERA_DIMS.1/2.0),
+        //     Vector2::zeros(),
+        //     50.0,
+        //     200,
+        //     (20.0, 200.0),
+        //     (0.7, 1.8),
+        //     true,
+        // );
     }
 
     fn update(&mut self, data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
         let StateData { world, .. } = data;
 
         if self.fps_display.is_none() {
-            info!("Setting fps display to some.");
             world.exec(|finder: UiFinder| {
                 if let Some(entity) = finder.find("fps") {
                     self.fps_display = Some(entity);
@@ -106,7 +107,7 @@ impl SimpleState for MainState {
             if let Some(fps_display) = self.fps_display.and_then(|entity| ui_text.get_mut(entity)) {
                 if world.read_resource::<Time>().frame_number() % 20 == 0 {
                     let fps = world.read_resource::<fps_counter::FpsCounter>().sampled_fps();
-                    fps_display.text = format!("FPS: {:.2}\n", fps);
+                    fps_display.text = format!("FPS: {:.2}", fps);
                 }
             }
         }
@@ -156,14 +157,14 @@ impl MainState {
         )
     }
 
-    fn add_planet(
+    fn add_body(
         &self,
         world: &mut World,
         pos: Point2<f32>,
         vel: Vector2<f32>,
         radius: f32,
     ) {
-        use components::physics::*;
+        use components::*;
         use ncollide2d::shape::Ball;
 
         let scale = radius * entities::body::PLANET_SPRITE_RATIO;
@@ -178,41 +179,44 @@ impl MainState {
         transform.set_translation_xyz(pos.x, pos.y, 0.0);
         transform.set_scale(scale_vec);
 
+        let mass = Mass::from_radius(radius, entities::body::PLANET_DENSITY);
+
         world.create_entity()
+            .with(BodyType::from_mass(mass.0))
             .with(transform)
             .with(render.clone())
             .with(Velocity(vel))
             .with(Force::default())
-            .with(Mass::from_radius(radius, entities::body::PLANET_DENSITY))
+            .with(mass)
             .with(Collider(Box::new(Ball::new(radius))))
             .build();
     }
 
-    pub fn add_planet_with_rings(
+    pub fn add_body_with_rings(
         &self,
         world: &mut World,
         rand_thread: &mut ThreadRng,
         position: Point2<f32>,
         velocity: Vector2<f32>,
     
-        main_planet_radius: f32,
+        main_body_radius: f32,
         moon_num: usize,
-        moon_orbit_radius_range: (f32, f32),    // Starting from surface of planet
+        moon_orbit_radius_range: (f32, f32),    // Starting from surface of body
         moon_body_radius_range: (f32, f32),
         orbit_direction_clockwise: bool,  // anticlockwise = false, clockwise = true
     ) {
         use std::f32::consts::PI;
 
-        self.add_planet(world, position.clone(), velocity.clone(), main_planet_radius);  // Add main planet
+        self.add_body(world, position.clone(), velocity.clone(), main_body_radius);  // Add main body
     
-        let main_planet_mass = tools::volume_of_sphere(main_planet_radius) * entities::body::PLANET_DENSITY;
+        let main_body_mass = tools::volume_of_sphere(main_body_radius) * entities::body::PLANET_DENSITY;
         let frame_velocity = velocity;
     
         for _ in 0..moon_num {
-            let orbit_radius = main_planet_radius + rand_thread.gen_range(moon_orbit_radius_range.0, moon_orbit_radius_range.1);
-            let orbit_speed = tools::circular_orbit_speed(main_planet_mass, orbit_radius);
-            let start_angle = rand_thread.gen_range(0.0, PI * 2.0);      // Angle from main planet to moon
-            let start_pos = Point2::new(orbit_radius * start_angle.cos(), orbit_radius * start_angle.sin());   // Position on circle orbit where planet will start
+            let orbit_radius = main_body_radius + rand_thread.gen_range(moon_orbit_radius_range.0, moon_orbit_radius_range.1);
+            let orbit_speed = tools::circular_orbit_speed(main_body_mass, orbit_radius);
+            let start_angle = rand_thread.gen_range(0.0, PI * 2.0);      // Angle from main body to moon
+            let start_pos = Point2::new(orbit_radius * start_angle.cos(), orbit_radius * start_angle.sin());   // Position on circle orbit where body will start
 
             let vel_angle = if orbit_direction_clockwise {
                 start_angle + PI/2.0
@@ -222,14 +226,10 @@ impl MainState {
             let start_velocity = Vector2::new(orbit_speed * vel_angle.cos(), orbit_speed * vel_angle.sin());
             let moon_radius = rand_thread.gen_range(moon_body_radius_range.0, moon_body_radius_range.1);
 
-            let pos = Point2::new(position.x + start_pos.x, position.y + start_pos.y);
-            info!("pos: {:?}", pos);
-            info!("Start_pos: {:?}", start_pos);
-
-            self.add_planet(
+            self.add_body(
                 world,
-                pos,
-                start_velocity + frame_velocity,  // Add velocity of main planet
+                Point2::new(position.x + start_pos.x, position.y + start_pos.y),
+                start_velocity + frame_velocity,  // Add velocity of main body
                 moon_radius,
             );
         }
@@ -245,6 +245,7 @@ fn main() -> amethyst::Result<()> {
     let assets_dir = app_root.join("assets");
     let config_dir = app_root.join("config");
     let display_config_path = config_dir.join("display.ron");
+    let bindings_path = config_dir.join("bindings.ron");
 
     let game_data = GameDataBuilder::default()
         .with_bundle(
@@ -258,14 +259,17 @@ fn main() -> amethyst::Result<()> {
         )?
         .with_bundle(TransformBundle::new())?
         .with_bundle(fps_counter::FpsCounterBundle)?
-        .with_bundle(InputBundle::<StringBindings>::new())?
+        .with_bundle(InputBundle::<StringBindings>::new()
+            .with_bindings_from_file(bindings_path)?)?
         .with_bundle(UiBundle::<StringBindings>::new())?
 
+        .with(systems::InputParsingSystem, "input_parsing_system", &[])
         .with(systems::physics::GravitySystem, "gravity_system", &[])
         .with(systems::physics::ForceSystem, "force_system", &["gravity_system"])
         .with(systems::physics::VelocitySystem, "velocity_system", &["force_system"])
         .with(systems::physics::CollisionDetectionSystem, "collision_detection_system", &["velocity_system"])
-        .with_system_desc(systems::physics::CollisionProcessingSystemDesc, "collision_processing_system", &[]);
+        .with_system_desc(systems::physics::CollisionProcessingSystemDesc, "collision_processing_system", &["collision_detection_system"])
+        .with_system_desc(systems::BodyCreationSystemDesc, "body_creation_system", &["collision_processing_system"]);
 
     let mut game = Application::new(assets_dir, MainState::new(), game_data)?;
     game.run();

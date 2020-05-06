@@ -2096,6 +2096,7 @@ dependencies = [
  "log",
  "ncollide2d",
  "rand 0.7.3",
+ "shred-derive",
  "shrinkwraprs",
 ]
 
