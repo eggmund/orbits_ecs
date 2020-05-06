@@ -62,11 +62,11 @@ impl SimpleState for MainState {
 
 
         let dist = 300.0;
-        self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 + 100.0), Vector2::zeros(), 30.0);
-        self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 - 100.0), Vector2::zeros(), 30.0);
+        // self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 + 100.0), Vector2::zeros(), 30.0);
+        // self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 - 100.0), Vector2::zeros(), 30.0);
 
-        self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 + dist/2.0, CAMERA_DIMS.1/2.0 + 100.0), Vector2::zeros(), 30.0);
-        self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 + dist/2.0, CAMERA_DIMS.1/2.0 - 100.0), Vector2::zeros(), 30.0);
+        // self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 + dist/2.0, CAMERA_DIMS.1/2.0 + 100.0), Vector2::zeros(), 30.0);
+        // self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 + dist/2.0, CAMERA_DIMS.1/2.0 - 100.0), Vector2::zeros(), 30.0);
 
 
         // self.add_planet(
@@ -75,17 +75,17 @@ impl SimpleState for MainState {
         //     Vector2::zeros(),
         //     30.0
         // );
-        // self.add_planet_with_rings(
-        //     world,
-        //     &mut rand_thread,
-        //     Point2::new(CAMERA_DIMS.0, CAMERA_DIMS.1),
-        //     Vector2::zeros(),
-        //     50.0,
-        //     10,
-        //     (100.0, 250.0),
-        //     (0.7, 2.0),
-        //     true,
-        // );
+        self.add_planet_with_rings(
+            world,
+            &mut rand_thread,
+            Point2::new(CAMERA_DIMS.0/2.0, CAMERA_DIMS.1/2.0),
+            Vector2::zeros(),
+            50.0,
+            400,
+            (20.0, 200.0),
+            (0.7, 1.8),
+            true,
+        );
     }
 
     fn update(&mut self, data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
@@ -163,7 +163,6 @@ impl MainState {
         vel: Vector2<f32>,
         radius: f32,
     ) {
-        const RAD: f32 = 30.0;
         use components::physics::*;
         use ncollide2d::shape::Ball;
 
@@ -184,8 +183,8 @@ impl MainState {
             .with(render.clone())
             .with(Velocity(vel))
             .with(Force::default())
-            .with(Mass::from_radius(RAD, entities::body::PLANET_DENSITY))
-            .with(Collider(Box::new(Ball::new(RAD))))
+            .with(Mass::from_radius(radius, entities::body::PLANET_DENSITY))
+            .with(Collider(Box::new(Ball::new(radius))))
             .build();
     }
 
@@ -222,10 +221,14 @@ impl MainState {
             };
             let start_velocity = Vector2::new(orbit_speed * vel_angle.cos(), orbit_speed * vel_angle.sin());
             let moon_radius = rand_thread.gen_range(moon_body_radius_range.0, moon_body_radius_range.1);
-    
+
+            let pos = Point2::new(position.x + start_pos.x, position.y + start_pos.y);
+            info!("pos: {:?}", pos);
+            info!("Start_pos: {:?}", start_pos);
+
             self.add_planet(
                 world,
-                Point2::new(position.x + start_pos.x, position.y + start_pos.y),
+                pos,
                 start_velocity + frame_velocity,  // Add velocity of main planet
                 moon_radius,
             );
@@ -262,7 +265,7 @@ fn main() -> amethyst::Result<()> {
         .with(systems::physics::ForceSystem, "force_system", &["gravity_system"])
         .with(systems::physics::VelocitySystem, "velocity_system", &["force_system"])
         .with(systems::physics::CollisionDetectionSystem, "collision_detection_system", &["velocity_system"])
-        .with_system_desc(systems::physics::CollisionProcessingSystemDesc, "collision_processing_system", &["sprite_visibility_system", "collision_detection_system"]);
+        .with_system_desc(systems::physics::CollisionProcessingSystemDesc, "collision_processing_system", &[]);
 
     let mut game = Application::new(assets_dir, MainState::new(), game_data)?;
     game.run();

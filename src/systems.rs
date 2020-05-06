@@ -32,7 +32,7 @@ pub mod physics {
     use crate::resources;
     use crate::events::{CollisionEvent};
     
-    pub const G: f32 = 0.001;    // Strength of gravity
+    pub const G: f32 = 0.0001;    // Strength of gravity
     
     pub struct VelocitySystem;
     
