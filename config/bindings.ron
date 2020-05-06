@@ -1,5 +1,9 @@
 (
-    axes: {},
+    axes: {
+        "planet_size": MouseWheel(
+            horizontal: false 
+        ),
+    },
     actions: {
         "add_planet": [[Mouse(Left)]],
     },

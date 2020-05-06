@@ -1,6 +1,5 @@
 #[macro_use] extern crate shrinkwraprs;
 #[macro_use] extern crate log;
-#[macro_use] extern crate shred_derive;
 
 mod components;
 mod systems;
@@ -45,7 +44,7 @@ struct MainState {
 impl SimpleState for MainState {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let world = data.world;
-        // let mut rand_thread = rand::thread_rng();
+        let mut rand_thread = rand::thread_rng();
 
         Self::init_camera(world);
         self.sprite_sheet = Some(self.load_spritesheet(world));
@@ -63,9 +62,9 @@ impl SimpleState for MainState {
         });
 
 
-        let dist = 300.0;
-        self.add_body(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 + 100.0), Vector2::zeros(), 30.0);
-        self.add_body(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 - 100.0), Vector2::zeros(), 30.0);
+        // let dist = 300.0;
+        // self.add_body(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 + 100.0), Vector2::zeros(), 30.0);
+        // self.add_body(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 - 100.0), Vector2::zeros(), 30.0);
 
         // self.add_body(world, Point2::new(CAMERA_DIMS.0/2.0 + dist/2.0, CAMERA_DIMS.1/2.0 + 100.0), Vector2::zeros(), 30.0);
         // self.add_body(world, Point2::new(CAMERA_DIMS.0/2.0 + dist/2.0, CAMERA_DIMS.1/2.0 - 100.0), Vector2::zeros(), 30.0);
@@ -77,17 +76,17 @@ impl SimpleState for MainState {
         //     Vector2::zeros(),
         //     30.0
         // );
-        // self.add_body_with_rings(
-        //     world,
-        //     &mut rand_thread,
-        //     Point2::new(CAMERA_DIMS.0/2.0, CAMERA_DIMS.1/2.0),
-        //     Vector2::zeros(),
-        //     50.0,
-        //     200,
-        //     (20.0, 200.0),
-        //     (0.7, 1.8),
-        //     true,
-        // );
+        self.add_body_with_rings(
+            world,
+            &mut rand_thread,
+            Point2::new(CAMERA_DIMS.0/2.0, CAMERA_DIMS.1/2.0),
+            Vector2::zeros(),
+            50.0,
+            200,
+            (20.0, 200.0),
+            (0.7, 1.8),
+            true,
+        );
     }
 
     fn update(&mut self, data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {

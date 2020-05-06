@@ -11,7 +11,7 @@ use amethyst::{
     input::{InputHandler, StringBindings},
 };
 use crate::components::*;
-use crate::resources::{SpriteRenders, MouseInfo};
+use crate::resources::*;
 use crate::events::BodyCreationEvent;
 
 
@@ -88,7 +88,6 @@ impl<'a> System<'a> for InputParsingSystem {
         use crate::CAMERA_DIMS;
 
         if input.action_is_down("add_planet").unwrap_or(false) && !mouse_info.is_down {
-            info!("Mouse down start.");
             mouse_info.is_down = true;
             let pos = input.mouse_position().unwrap();
             mouse_info.click_pos = Some(Vector2::new(pos.0, CAMERA_DIMS.1 - pos.1));
@@ -96,27 +95,25 @@ impl<'a> System<'a> for InputParsingSystem {
 
         // if no longer down
         if !input.action_is_down("add_planet").unwrap_or(false) && mouse_info.is_down && mouse_info.click_pos.is_some() {
-            const RAD: f32 = 10.0;
+            if let Some(curr_pos) = input.mouse_position() {
+                let curr_pos = Vector2::new(curr_pos.0, CAMERA_DIMS.1 - curr_pos.1);
 
-            let original_click_pos = mouse_info.click_pos.unwrap();
-
-            info!("Mouse down end.");
-            mouse_info.is_down = false;
-            let curr_pos = {
-                let pos = input.mouse_position().unwrap();
-                Vector2::new(pos.0, CAMERA_DIMS.1 - pos.1)
-            };
-
-            let d_pos = original_click_pos - curr_pos;
-            let mass = crate::tools::volume_of_sphere(RAD) * crate::entities::body::PLANET_DENSITY;
-
-            body_creation_channel.single_write(BodyCreationEvent {
-                body_type: BodyType::from_mass(mass),
-                position: original_click_pos.into(),
-                velocity: d_pos,
-                mass,
-                radius: RAD,
-            });
+                let original_click_pos = mouse_info.click_pos.unwrap();
+                let mouse_spawn_radius = input.axis_value("planet_size").unwrap().max(1.0);
+    
+                mouse_info.is_down = false;
+    
+                let d_pos = original_click_pos - curr_pos;
+                let mass = crate::tools::volume_of_sphere(mouse_spawn_radius) * crate::entities::body::PLANET_DENSITY;
+    
+                body_creation_channel.single_write(BodyCreationEvent {
+                    body_type: BodyType::from_mass(mass),
+                    position: original_click_pos.into(),
+                    velocity: d_pos,
+                    mass,
+                    radius: mouse_spawn_radius,
+                });
+            }
         }
     }
 }
@@ -170,29 +167,63 @@ pub mod physics {
     
     impl<'a> System<'a> for GravitySystem {
         type SystemData = (
-            Entities<'a>,
             ReadStorage<'a, Transform>,
             ReadStorage<'a, Mass>,
             WriteStorage<'a, Force>,
         );
     
-        fn run(&mut self, (entities, transforms, masses, mut forces): Self::SystemData) {
-            for (entity, force, mass, transform) in (&entities, &mut forces, &masses, &transforms).join() {
-                for (other_entity, other_mass, other_transform) in
-                    (&entities, &masses, &transforms).join()
-                        .filter(|(e, _, _)| e.id() != entity.id()) // If not the same planet
-                {
+        fn run(&mut self, (transforms, masses, mut forces): Self::SystemData) {
+            struct GravBody<'a> {   // Helper struct to make things less confusing
+                force: &'a mut Force,
+                mass: &'a Mass,
+                transform: &'a Transform,
+            }
+
+            let mut grav_bodies: Vec<GravBody> = 
+                (&mut forces, &masses, &transforms).join()
+                    .map(|(force, mass, transform)| GravBody {
+                        force,
+                        mass,
+                        transform,
+                    }).collect();
+
+            // Bodies that experience gravity are collected so that an optimised approach can be used.
+            // Since the force experienced between to planets is equal and _opposite_ for the other planet,
+            // we only need to calculate the force between a pair.
+
+            let len = grav_bodies.len();
+            for i in 0..len-1 { // For every body except from last
+                for j in i+1..len {   // For every body not done (i) onwards
                     // F = GMm/r^2
                     // F_vec = (GMm/r^2) r_hat = (GMm/r^3) r_vec
                     // r is vector from this object to other object
-                    let r_vec_3 = other_transform.translation() - transform.translation();
+                    let r_vec_3 = grav_bodies[j].transform.translation() - grav_bodies[i].transform.translation();
                     let r_vec = Vector2::new(r_vec_3.x, r_vec_3.y); // Convert to 2D
                     let distance_cubed = r_vec.norm().powi(3);
-                    let grav_force = (G * mass.0 * other_mass.0/distance_cubed) * r_vec;
-    
-                    force.0 += grav_force;
+                    // grav_force will be experienced by both
+                    let grav_force = (G * grav_bodies[i].mass.0 * grav_bodies[j].mass.0/distance_cubed) * r_vec;
+
+                    grav_bodies[i].force.0 += grav_force;
+                    grav_bodies[j].force.0 -= grav_force;   // -= cause force is applied in opposite direction
                 }
             }
+
+            // for (entity, force, mass, transform) in  {
+            //     for (_other_entity, other_mass, other_transform) in
+            //         (&entities, &masses, &transforms).join()
+            //             .filter(|(e, _, _)| e.id() != entity.id()) // If not the same planet
+            //     {
+            //         // F = GMm/r^2
+            //         // F_vec = (GMm/r^2) r_hat = (GMm/r^3) r_vec
+            //         // r is vector from this object to other object
+            //         let r_vec_3 = other_transform.translation() - transform.translation();
+            //         let r_vec = Vector2::new(r_vec_3.x, r_vec_3.y); // Convert to 2D
+            //         let distance_cubed = r_vec.norm().powi(3);
+            //         let grav_force = (G * mass.0 * other_mass.0/distance_cubed) * r_vec;
+    
+            //         force.0 += grav_force;
+            //     }
+            // }
         }
     }
     

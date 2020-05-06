@@ -1,5 +1,5 @@
 use amethyst::{
-    ecs::{Entity, Entities, WriteStorage},
+    ecs::{Entity, Entities},
     core::{
         math::{Point2, Vector2, Vector3},
         transform::Transform,

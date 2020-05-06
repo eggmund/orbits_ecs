@@ -1,6 +1,5 @@
 use amethyst::{
-    assets::{Handle},
-    renderer::{SpriteSheet, SpriteRender},
+    renderer::{SpriteRender},
     core::{
         math::{Vector2},
     },
