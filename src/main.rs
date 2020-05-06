@@ -61,16 +61,20 @@ impl SimpleState for MainState {
         });
 
 
-        let dist = 200.0;
-        self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0), Vector2::zeros(), 30.0);
-        self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 + dist/2.0, CAMERA_DIMS.1/2.0), Vector2::zeros(), 30.0);
+        let dist = 300.0;
+        self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 + 100.0), Vector2::zeros(), 30.0);
+        self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 - dist/2.0, CAMERA_DIMS.1/2.0 - 100.0), Vector2::zeros(), 30.0);
 
-        self.add_planet(
-            world,
-            Point2::new(CAMERA_DIMS.0/2.0, CAMERA_DIMS.1/2.0 + (dist.powi(2) - (dist/2.0).powi(2)).sqrt()), // Using pythag
-            Vector2::zeros(),
-            30.0
-        );
+        self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 + dist/2.0, CAMERA_DIMS.1/2.0 + 100.0), Vector2::zeros(), 30.0);
+        self.add_planet(world, Point2::new(CAMERA_DIMS.0/2.0 + dist/2.0, CAMERA_DIMS.1/2.0 - 100.0), Vector2::zeros(), 30.0);
+
+
+        // self.add_planet(
+        //     world,
+        //     Point2::new(CAMERA_DIMS.0/2.0, CAMERA_DIMS.1/2.0 + (dist.powi(2) - (dist/2.0).powi(2)).sqrt()), // Using pythag
+        //     Vector2::zeros(),
+        //     30.0
+        // );
         // self.add_planet_with_rings(
         //     world,
         //     &mut rand_thread,

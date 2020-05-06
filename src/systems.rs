@@ -174,10 +174,10 @@ pub mod physics {
                     } else {
                         if contains1 {
                             info!("Inserting {:?} into group {:?}", e2, group);
-                            if group.insert(e2) { error!("Entity {} was already in collision group {:?}.", e2.id(), group) }
+                            if !group.insert(e2) { error!("Entity {} was already in collision group {:?}.", e2.id(), group) }
                         } else if contains2 {
                             info!("Inserting {:?} into group {:?}", e1, group);
-                            if group.insert(e1) { error!("Entity {} was already in collision group {:?}.", e1.id(), group) }
+                            if !group.insert(e1) { error!("Entity {} was already in collision group {:?}.", e1.id(), group) }
                         }
                     }
                     existing_group_found = true;
